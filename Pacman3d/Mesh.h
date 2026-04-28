@@ -25,7 +25,7 @@ struct Texture
 class Mesh
 {
 public:
-    Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures);
+    Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures, const glm::vec3& diffuseColor = glm::vec3(1.0f));
 
     void Draw(GLuint shaderProgram) const;
 
@@ -35,6 +35,7 @@ private:
     std::vector<Vertex> vertices_;
     std::vector<unsigned int> indices_;
     std::vector<Texture> textures_;
+    glm::vec3 diffuseColor_;
 
     GLuint vao_ = 0;
     GLuint vbo_ = 0;

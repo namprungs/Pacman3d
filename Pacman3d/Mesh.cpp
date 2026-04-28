@@ -2,8 +2,8 @@
 
 #include <cstddef>
 
-Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures)
-    : vertices_(vertices), indices_(indices), textures_(textures)
+Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures, const glm::vec3& diffuseColor)
+    : vertices_(vertices), indices_(indices), textures_(textures), diffuseColor_(diffuseColor)
 {
     SetupMesh();
 }
@@ -24,6 +24,10 @@ void Mesh::Draw(GLuint shaderProgram) const
     }
 
     glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), hasDiffuse ? 1 : 0);
+    if (!hasDiffuse)
+    {
+        glUniform3f(glGetUniformLocation(shaderProgram, "objectColor"), diffuseColor_.r, diffuseColor_.g, diffuseColor_.b);
+    }
 
     glBindVertexArray(vao_);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, nullptr);

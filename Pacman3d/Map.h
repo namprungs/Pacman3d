@@ -1,10 +1,13 @@
 #pragma once
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+
+class Model;
 
 class Map
 {
@@ -36,4 +39,8 @@ private:
     GLuint sphereVbo_ = 0;
     GLuint sphereEbo_ = 0;
     GLsizei sphereIndexCount_ = 0;
+
+    std::unique_ptr<Model> coinModel_;
+    std::unique_ptr<Model> powerItemModel_;
+    std::unique_ptr<Model> bonusItemModel_;
 };

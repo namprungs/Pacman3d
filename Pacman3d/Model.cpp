@@ -225,9 +225,19 @@ Mesh Model::ProcessMesh(const aiMesh* mesh, const aiScene* scene)
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
     }
 
+    glm::vec3 diffuseColor(1.0f);
+    if (mesh->mMaterialIndex >= 0)
+    {
+        aiColor3D color(1.0f, 1.0f, 1.0f);
+        if (scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS)
+        {
+            diffuseColor = glm::vec3(color.r, color.g, color.b);
+        }
+    }
+
     ExtractBoneWeightForVertices(vertices, mesh, scene);
 
-    return Mesh(vertices, indices, textures);
+    return Mesh(vertices, indices, textures, diffuseColor);
 }
 
 std::vector<Texture> Model::LoadMaterialTextures(const aiMaterial* mat, aiTextureType type, const std::string& typeName)
