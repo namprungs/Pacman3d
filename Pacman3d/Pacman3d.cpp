@@ -158,7 +158,8 @@ int main()
     ImGui_ImplOpenGL3_Init("#version 330");
 
     const GLuint shaderProgram = createShaderProgram("shaders/basic.vert", "shaders/basic.frag");
-    if (shaderProgram == 0)
+    const GLuint skinnedShaderProgram = createShaderProgram("shaders/skinned.vert", "shaders/skinned.frag");
+    if (shaderProgram == 0 || skinnedShaderProgram == 0)
     {
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -178,7 +179,7 @@ int main()
         glm::radians(50.0f), static_cast<float>(kWindowWidth) / static_cast<float>(kWindowHeight), 0.1f, 100.0f);
 
     float lastTime = static_cast<float>(glfwGetTime());
-    float fruitSpawnTimer = 0.0f;
+    float itemSpawnTimer = 0.0f;
     int score = 0;
     int level = 1;
     bool gameOver = false;
@@ -201,6 +202,7 @@ int main()
         if (!gameOver && !gameWon)
         {
             player.update(window, deltaTime, map);
+            player.updateAnimation(deltaTime);
 
             const glm::ivec2 playerCell = player.getGridPosition();
             const int consumedItem = map.consumeItemAt(playerCell.x, playerCell.y);
@@ -221,18 +223,19 @@ int main()
                 score += 250;
             }
 
-            fruitSpawnTimer += deltaTime;
-            if (fruitSpawnTimer >= 8.0f)
+            itemSpawnTimer += deltaTime;
+            if (itemSpawnTimer >= 8.0f)
             {
-                fruitSpawnTimer = 0.0f;
-                map.spawnRandomFruit();
+                itemSpawnTimer = 0.0f;
+                map.spawnRandomItem();
             }
 
             for (Ghost& ghost : ghosts)
             {
                 ghost.update(deltaTime, map, player);
+                ghost.updateAnimation(deltaTime);
                 const GhostState stateBeforeCollision = ghost.getState();
-                if (ghost.checkCollisionWithPlayer(player) && stateBeforeCollision == GhostState::FRIGHTENED)
+                if (ghost.checkCollisionWithPlayer(player, map) && stateBeforeCollision == GhostState::FRIGHTENED)
                 {
                     score += 200;
                 }
@@ -277,7 +280,7 @@ int main()
                 ghosts = createGhosts();
                 score = 0;
                 level = 1;
-                fruitSpawnTimer = 0.0f;
+                itemSpawnTimer = 0.0f;
                 gameOver = false;
                 gameWon = false;
                 gameOverPopupOpened = false;
@@ -304,7 +307,7 @@ int main()
                 map.reset();
                 player.reset();
                 ghosts = createGhosts();
-                fruitSpawnTimer = 0.0f;
+                itemSpawnTimer = 0.0f;
                 gameOver = false;
                 gameWon = false;
                 gameOverPopupOpened = false;
@@ -341,10 +344,14 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
         map.drawMap(shaderProgram);
-        player.draw(shaderProgram);
+
+        glUseProgram(skinnedShaderProgram);
+        glUniformMatrix4fv(glGetUniformLocation(skinnedShaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(skinnedShaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
+        player.draw(skinnedShaderProgram);
         for (const Ghost& ghost : ghosts)
         {
-            ghost.draw(shaderProgram);
+            ghost.draw(skinnedShaderProgram);
         }
 
         ImGui::Render();
@@ -359,6 +366,7 @@ int main()
     ImGui::DestroyContext();
 
     glDeleteProgram(shaderProgram);
+    glDeleteProgram(skinnedShaderProgram);
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;

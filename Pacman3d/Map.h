@@ -20,6 +20,7 @@ public:
     int consumeItemAt(int gridX, int gridZ);
     bool hasRemainingDots() const;
     bool spawnRandomFruit();
+    bool spawnRandomItem();
     void reset();
 
 private:

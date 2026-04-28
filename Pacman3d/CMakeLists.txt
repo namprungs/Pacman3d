@@ -5,8 +5,19 @@
 # Add source to this project's executable.
 add_executable(Pacman3d
   Pacman3d.cpp
+  Animation.cpp
+  Animation.h
+  AnimationData.h
+  Animator.cpp
+  Animator.h
+  Bone.cpp
+  Bone.h
   Map.cpp
   Map.h
+  Mesh.cpp
+  Mesh.h
+  Model.cpp
+  Model.h
   Player.cpp
   Player.h
   Ghost.cpp
@@ -37,6 +48,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
+FetchContent_Declare(
+  stb
+  GIT_REPOSITORY https://github.com/nothings/stb.git
+  GIT_TAG master
+)
+FetchContent_MakeAvailable(stb)
+
 find_package(glm CONFIG QUIET)
 if (NOT glm_FOUND)
   FetchContent_Declare(
@@ -45,6 +63,20 @@ if (NOT glm_FOUND)
     GIT_TAG 1.0.1
   )
   FetchContent_MakeAvailable(glm)
+endif()
+
+find_package(assimp CONFIG QUIET)
+if (NOT assimp_FOUND)
+  set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+  set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY https://github.com/assimp/assimp.git
+    GIT_TAG v5.4.1
+  )
+  FetchContent_MakeAvailable(assimp)
 endif()
 
 find_package(GLEW QUIET)
@@ -79,6 +111,11 @@ if (TARGET glm)
   set(GLM_TARGET glm)
 endif()
 
+set(ASSIMP_TARGET assimp)
+if (TARGET assimp::assimp)
+  set(ASSIMP_TARGET assimp::assimp)
+endif()
+
 set(GLEW_TARGET "")
 if (TARGET GLEW::GLEW)
   set(GLEW_TARGET GLEW::GLEW)
@@ -108,6 +145,7 @@ target_include_directories(Pacman3d
   PRIVATE
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
+    ${stb_SOURCE_DIR}
 )
 
 target_link_libraries(Pacman3d
@@ -116,6 +154,7 @@ target_link_libraries(Pacman3d
     ${GLFW_TARGET}
     ${GLEW_TARGET}
     ${GLM_TARGET}
+    ${ASSIMP_TARGET}
 )
 
 if (GLEW_TARGET STREQUAL "libglew_static" OR GLEW_TARGET STREQUAL "glew::glew_s")
@@ -123,9 +162,14 @@ if (GLEW_TARGET STREQUAL "libglew_static" OR GLEW_TARGET STREQUAL "glew::glew_s"
 endif()
 
 target_compile_definitions(Pacman3d PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLEW)
+target_compile_definitions(Pacman3d PRIVATE GLM_ENABLE_EXPERIMENTAL)
+target_compile_definitions(Pacman3d PRIVATE PACMAN3D_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders/basic.vert" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders/basic.frag" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinned.vert" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders/skinned.frag" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/resources" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 # TODO: Add tests and install targets if needed.

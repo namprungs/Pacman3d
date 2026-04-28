@@ -274,9 +274,37 @@ bool Map::spawnRandomFruit()
     }
 
     static std::mt19937 rng(std::random_device{}());
-    std::uniform_int_distribution<std::size_t> dist(0, availableCells.size() - 1);
-    const glm::ivec2 cell = availableCells[dist(rng)];
+    std::uniform_int_distribution<std::size_t> cellDist(0, availableCells.size() - 1);
+    const glm::ivec2 cell = availableCells[cellDist(rng)];
     grid_[cell.y][cell.x] = 4;
+    return true;
+}
+
+bool Map::spawnRandomItem()
+{
+    std::vector<glm::ivec2> availableCells;
+    for (std::size_t z = 0; z < grid_.size(); ++z)
+    {
+        for (std::size_t x = 0; x < grid_[z].size(); ++x)
+        {
+            if (grid_[z][x] == 0)
+            {
+                availableCells.emplace_back(static_cast<int>(x), static_cast<int>(z));
+            }
+        }
+    }
+
+    if (availableCells.empty())
+    {
+        return false;
+    }
+
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<std::size_t> cellDist(0, availableCells.size() - 1);
+    std::uniform_int_distribution<int> itemDist(0, 1);
+
+    const glm::ivec2 cell = availableCells[cellDist(rng)];
+    grid_[cell.y][cell.x] = itemDist(rng) == 0 ? 3 : 4;
     return true;
 }
 

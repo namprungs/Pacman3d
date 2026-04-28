@@ -1,14 +1,45 @@
 #include "Ghost.h"
-#include "Ghost.h"
 
+#include "Animation.h"
+#include "Animator.h"
 #include "Map.h"
+#include "Model.h"
 #include "Player.h"
 
 #include <cmath>
 #include <limits>
+#include <memory>
+#include <random>
+#include <string>
 #include <vector>
 
 #include <glm/gtc/matrix_transform.hpp>
+
+namespace
+{
+    struct GhostAssets
+    {
+        std::shared_ptr<Model> model;
+        std::shared_ptr<Animation> runAnimation;
+        std::shared_ptr<Animation> crawlAnimation;
+        std::shared_ptr<Animation> attackAnimation;
+        std::shared_ptr<Animation> neckBiteAnimation;
+    };
+
+    GhostAssets& getGhostAssets()
+    {
+        static GhostAssets assets;
+        if (!assets.model)
+        {
+            assets.model = std::make_shared<Model>("resources/objects/zombie/zombie_run.dae");
+            assets.runAnimation = std::make_shared<Animation>("resources/objects/zombie/zombie_run.dae", assets.model.get());
+            assets.crawlAnimation = std::make_shared<Animation>("resources/objects/zombie/low_crawl.dae", assets.model.get());
+            assets.attackAnimation = std::make_shared<Animation>("resources/objects/zombie/zombie_attack.dae", assets.model.get());
+            assets.neckBiteAnimation = std::make_shared<Animation>("resources/objects/zombie/zombie_neck_bite.dae", assets.model.get());
+        }
+        return assets;
+    }
+}
 
 Ghost::Ghost(GhostType type, const glm::ivec2& startGridPosition, const glm::ivec2& scatterCorner, const glm::vec3& color)
     : type_(type),
@@ -22,119 +53,24 @@ Ghost::Ghost(GhostType type, const glm::ivec2& startGridPosition, const glm::ive
       halfExtents_(0.30f, 0.30f, 0.30f),
       color_(color),
       rotationYDegrees_(0.0f),
-      moveSpeed_(2.4f),
+      moveSpeed_(1.2f),
       frightenedTimer_(0.0f),
       stateTimer_(0.0f)
 {
-    initCubeMesh();
+    const GhostAssets& assets = getGhostAssets();
+    model_ = assets.model;
+    runAnimation_ = assets.runAnimation;
+    crawlAnimation_ = assets.crawlAnimation;
+    attackAnimation_ = assets.attackAnimation;
+    neckBiteAnimation_ = assets.neckBiteAnimation;
+    animator_ = std::make_unique<Animator>(runAnimation_.get());
 }
 
-Ghost::~Ghost()
-{
-    if (cubeVbo_ != 0)
-    {
-        glDeleteBuffers(1, &cubeVbo_);
-    }
-    if (cubeVao_ != 0)
-    {
-        glDeleteVertexArrays(1, &cubeVao_);
-    }
-}
+Ghost::~Ghost() = default;
 
-Ghost::Ghost(Ghost&& other) noexcept
-    : type_(other.type_),
-      state_(other.state_),
-      currentGridPosition_(other.currentGridPosition_),
-      targetGridPosition_(other.targetGridPosition_),
-      previousGridPosition_(other.previousGridPosition_),
-      scatterCorner_(other.scatterCorner_),
-      spawnGridPosition_(other.spawnGridPosition_),
-      position_(other.position_),
-      halfExtents_(other.halfExtents_),
-      color_(other.color_),
-      rotationYDegrees_(other.rotationYDegrees_),
-      moveSpeed_(other.moveSpeed_),
-      frightenedTimer_(other.frightenedTimer_),
-      stateTimer_(other.stateTimer_),
-      cubeVao_(other.cubeVao_),
-      cubeVbo_(other.cubeVbo_)
-{
-    other.cubeVao_ = 0;
-    other.cubeVbo_ = 0;
-}
+Ghost::Ghost(Ghost&& other) noexcept = default;
 
-Ghost& Ghost::operator=(Ghost&& other) noexcept
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    if (cubeVbo_ != 0)
-    {
-        glDeleteBuffers(1, &cubeVbo_);
-    }
-    if (cubeVao_ != 0)
-    {
-        glDeleteVertexArrays(1, &cubeVao_);
-    }
-
-    type_ = other.type_;
-    state_ = other.state_;
-    currentGridPosition_ = other.currentGridPosition_;
-    targetGridPosition_ = other.targetGridPosition_;
-    previousGridPosition_ = other.previousGridPosition_;
-    scatterCorner_ = other.scatterCorner_;
-    spawnGridPosition_ = other.spawnGridPosition_;
-    position_ = other.position_;
-    halfExtents_ = other.halfExtents_;
-    color_ = other.color_;
-    rotationYDegrees_ = other.rotationYDegrees_;
-    moveSpeed_ = other.moveSpeed_;
-    frightenedTimer_ = other.frightenedTimer_;
-    stateTimer_ = other.stateTimer_;
-    cubeVao_ = other.cubeVao_;
-    cubeVbo_ = other.cubeVbo_;
-
-    other.cubeVao_ = 0;
-    other.cubeVbo_ = 0;
-
-    return *this;
-}
-
-void Ghost::initCubeMesh()
-{
-    const float cubeVertices[] = {
-        -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f,
-        0.5f,  0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, -0.5f, -0.5f,
-
-        -0.5f, -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  0.5f,  0.5f,
-        0.5f,  0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  -0.5f, -0.5f, 0.5f,
-
-        -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  -0.5f, -0.5f, -0.5f, -0.5f,
-        -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f,  -0.5f, 0.5f,  0.5f,
-
-        0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  -0.5f, 0.5f,  -0.5f, -0.5f,
-        0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, 0.5f,  0.5f,  0.5f,  0.5f,
-
-        -0.5f, -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, 0.5f,
-        0.5f,  -0.5f, 0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, -0.5f,
-
-        -0.5f, 0.5f,  -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  0.5f,
-        0.5f,  0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  -0.5f};
-
-    glGenVertexArrays(1, &cubeVao_);
-    glGenBuffers(1, &cubeVbo_);
-
-    glBindVertexArray(cubeVao_);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-}
+Ghost& Ghost::operator=(Ghost&& other) noexcept = default;
 
 void Ghost::update(float deltaTime, const Map& map, const Player& player)
 {
@@ -185,6 +121,23 @@ void Ghost::update(float deltaTime, const Map& map, const Player& player)
         const glm::vec3 dir = glm::normalize(movementDirection);
         rotationYDegrees_ = glm::degrees(std::atan2(dir.x, dir.z));
     }
+
+    if (attackTimer_ > 0.0f)
+    {
+        attackTimer_ -= deltaTime;
+        if (attackTimer_ <= 0.0f)
+        {
+            updateAnimationState();
+        }
+    }
+}
+
+void Ghost::updateAnimation(float deltaTime)
+{
+    if (animator_)
+    {
+        animator_->UpdateAnimation(deltaTime * 0.7f);
+    }
 }
 
 void Ghost::draw(GLuint shaderProgram) const
@@ -195,7 +148,7 @@ void Ghost::draw(GLuint shaderProgram) const
     glm::mat4 model(1.0f);
     model = glm::translate(model, position_);
     model = glm::rotate(model, glm::radians(rotationYDegrees_), glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::scale(model, glm::vec3(halfExtents_ / 0.5f));
+    model = glm::scale(model, glm::vec3(modelScale_));
 
     glm::vec3 drawColor = color_;
     if (state_ == GhostState::FRIGHTENED)
@@ -206,18 +159,30 @@ void Ghost::draw(GLuint shaderProgram) const
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
     glUniform3f(colorLoc, drawColor.r, drawColor.g, drawColor.b);
 
-    glBindVertexArray(cubeVao_);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
+    if (animator_)
+    {
+        const auto& transforms = animator_->GetFinalBoneMatrices();
+        for (std::size_t i = 0; i < transforms.size(); ++i)
+        {
+            std::string name = "finalBonesMatrices[" + std::to_string(i) + "]";
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, name.c_str()), 1, GL_FALSE, &transforms[i][0][0]);
+        }
+    }
+
+    if (model_)
+    {
+        model_->Draw(shaderProgram);
+    }
 }
 
 void Ghost::triggerFrightened(float durationSeconds)
 {
     frightenedTimer_ = durationSeconds;
     state_ = GhostState::FRIGHTENED;
+    setFrightened(true);
 }
 
-bool Ghost::checkCollisionWithPlayer(Player& player)
+bool Ghost::checkCollisionWithPlayer(Player& player, const Map& map)
 {
     const glm::vec3 playerHalfExtents(0.35f, 0.35f, 0.35f);
     const glm::vec3 playerMin = player.getPosition() - playerHalfExtents;
@@ -233,16 +198,12 @@ bool Ghost::checkCollisionWithPlayer(Player& player)
 
     if (state_ == GhostState::FRIGHTENED)
     {
-        currentGridPosition_ = spawnGridPosition_;
-        targetGridPosition_ = spawnGridPosition_;
-        previousGridPosition_ = spawnGridPosition_;
-        position_ = glm::vec3(static_cast<float>(spawnGridPosition_.x), 0.35f, static_cast<float>(spawnGridPosition_.y));
-        frightenedTimer_ = 0.0f;
-        state_ = GhostState::SCATTER;
+        respawnAwayFromPlayer(map, player);
         return true;
     }
 
     player.loseLife();
+    triggerAttack();
     return true;
 }
 
@@ -256,6 +217,100 @@ void Ghost::reset()
     rotationYDegrees_ = 0.0f;
     frightenedTimer_ = 0.0f;
     stateTimer_ = 0.0f;
+    attackTimer_ = 0.0f;
+    setFrightened(false);
+    updateAnimationState();
+}
+
+void Ghost::setFrightened(bool frightened)
+{
+    if (isFrightened_ == frightened)
+    {
+        return;
+    }
+
+    isFrightened_ = frightened;
+    updateAnimationState();
+}
+
+void Ghost::triggerAttack()
+{
+    useNeckBite_ = !useNeckBite_;
+    Animation* attack = useNeckBite_ ? neckBiteAnimation_.get() : attackAnimation_.get();
+    if (animator_ && attack)
+    {
+        animator_->PlayAnimation(attack);
+        const float duration = attack->GetDuration();
+        const float ticks = attack->GetTicksPerSecond();
+        attackDuration_ = (ticks > 0.0f) ? (duration / ticks) : 0.0f;
+        attackTimer_ = attackDuration_ > 0.0f ? attackDuration_ : 0.8f;
+    }
+}
+
+void Ghost::updateAnimationState()
+{
+    if (!animator_)
+    {
+        return;
+    }
+
+    if (attackTimer_ > 0.0f)
+    {
+        return;
+    }
+
+    if (isFrightened_)
+    {
+        animator_->PlayAnimation(crawlAnimation_.get());
+    }
+    else
+    {
+        animator_->PlayAnimation(runAnimation_.get());
+    }
+}
+
+void Ghost::respawnAwayFromPlayer(const Map& map, const Player& player)
+{
+    std::vector<glm::ivec2> candidates;
+    const auto& grid = map.getGrid();
+    const glm::ivec2 playerCell = player.getGridPosition();
+
+    for (std::size_t z = 0; z < grid.size(); ++z)
+    {
+        for (std::size_t x = 0; x < grid[z].size(); ++x)
+        {
+            if (grid[z][x] == 1)
+            {
+                continue;
+            }
+
+            const glm::ivec2 cell(static_cast<int>(x), static_cast<int>(z));
+            if (glm::length(glm::vec2(cell - playerCell)) < 3.0f)
+            {
+                continue;
+            }
+
+            candidates.push_back(cell);
+        }
+    }
+
+    glm::ivec2 respawnCell = spawnGridPosition_;
+    if (!candidates.empty())
+    {
+        static std::mt19937 rng(std::random_device{}());
+        std::uniform_int_distribution<std::size_t> dist(0, candidates.size() - 1);
+        respawnCell = candidates[dist(rng)];
+    }
+
+    currentGridPosition_ = respawnCell;
+    targetGridPosition_ = respawnCell;
+    previousGridPosition_ = respawnCell;
+    position_ = glm::vec3(static_cast<float>(respawnCell.x), 0.35f, static_cast<float>(respawnCell.y));
+    frightenedTimer_ = 0.0f;
+    state_ = GhostState::SCATTER;
+    stateTimer_ = 0.0f;
+    setFrightened(false);
+    updateAnimationState();
 }
 
 glm::vec3 Ghost::getPosition() const

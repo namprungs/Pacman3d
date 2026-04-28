@@ -4,8 +4,13 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
+#include <memory>
+
 class Map;
 class Player;
+class Animation;
+class Animator;
+class Model;
 
 enum class GhostState
 {
@@ -34,17 +39,21 @@ public:
     Ghost& operator=(Ghost&& other) noexcept;
 
     void update(float deltaTime, const Map& map, const Player& player);
+    void updateAnimation(float deltaTime);
     void draw(GLuint shaderProgram) const;
 
     void triggerFrightened(float durationSeconds);
-    bool checkCollisionWithPlayer(Player& player);
+    bool checkCollisionWithPlayer(Player& player, const Map& map);
     void reset();
 
     glm::vec3 getPosition() const;
     GhostState getState() const;
 
 private:
-    void initCubeMesh();
+    void setFrightened(bool frightened);
+    void triggerAttack();
+    void updateAnimationState();
+    void respawnAwayFromPlayer(const Map& map, const Player& player);
 
     glm::ivec2 chooseNextCell(const Map& map, const Player& player) const;
     glm::ivec2 getChaseTarget(const Player& player) const;
@@ -69,6 +78,15 @@ private:
     float frightenedTimer_;
     float stateTimer_;
 
-    GLuint cubeVao_ = 0;
-    GLuint cubeVbo_ = 0;
+    std::shared_ptr<Model> model_;
+    std::shared_ptr<Animation> runAnimation_;
+    std::shared_ptr<Animation> crawlAnimation_;
+    std::shared_ptr<Animation> attackAnimation_;
+    std::shared_ptr<Animation> neckBiteAnimation_;
+    std::unique_ptr<Animator> animator_;
+    float attackTimer_ = 0.0f;
+    float attackDuration_ = 0.0f;
+    bool useNeckBite_ = false;
+    bool isFrightened_ = false;
+    float modelScale_ = 0.95f;
 };

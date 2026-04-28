@@ -1,157 +1,44 @@
 #include "Player.h"
-#include "Player.h"
 
+#include "Animation.h"
+#include "AnimationData.h"
+#include "Animator.h"
 #include "Map.h"
+#include "Model.h"
 
+#include <algorithm>
 #include <cmath>
-#include <vector>
+#include <iostream>
+#include <memory>
+#include <string>
 
 #include <glm/gtc/matrix_transform.hpp>
-
-namespace
-{
-    constexpr float kPi = 3.14159265358979323846f;
-    constexpr int kSphereStacks = 12;
-    constexpr int kSphereSectors = 18;
-}
 
 Player::Player()
     : position_(1.0f, 0.35f, 1.0f),
       spawnPosition_(1.0f, 0.35f, 1.0f),
-      halfExtents_(0.35f, 0.35f, 0.35f),
+      halfExtents_(0.43f, 0.35f, 0.43f),
       forwardDirection_(0.0f, 0.0f, 1.0f),
       rotationYDegrees_(0.0f),
-      moveSpeed_(3.5f),
+      moveSpeed_(3.4f),
       hitCooldown_(0.0f),
       lives_(3)
 {
-    initSphereMesh();
-    initCubeMesh();
+    model_ = std::make_unique<Model>("resources/objects/player/Idle.dae");
+    if (model_ && model_->IsLoaded())
+    {
+        std::cout << "Loaded model: resources/objects/player/Idle.dae (" << model_->GetMeshCount() << " meshes)\n";
+    }
+    else
+    {
+        std::cout << "Failed to load model: resources/objects/player/Idle.dae\n";
+    }
+    idleAnimation_ = std::make_unique<Animation>("resources/objects/player/Idle.dae", model_.get());
+    walkAnimation_ = std::make_unique<Animation>("resources/objects/player/Running.dae", model_.get());
+    animator_ = std::make_unique<Animator>(idleAnimation_.get());
 }
 
-Player::~Player()
-{
-    if (cubeVbo_ != 0)
-    {
-        glDeleteBuffers(1, &cubeVbo_);
-    }
-    if (cubeVao_ != 0)
-    {
-        glDeleteVertexArrays(1, &cubeVao_);
-    }
-
-    if (sphereEbo_ != 0)
-    {
-        glDeleteBuffers(1, &sphereEbo_);
-    }
-    if (sphereVbo_ != 0)
-    {
-        glDeleteBuffers(1, &sphereVbo_);
-    }
-    if (sphereVao_ != 0)
-    {
-        glDeleteVertexArrays(1, &sphereVao_);
-    }
-}
-
-void Player::initSphereMesh()
-{
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
-
-    for (int i = 0; i <= kSphereStacks; ++i)
-    {
-        const float stackAngle = kPi / 2.0f - i * kPi / kSphereStacks;
-        const float xy = std::cos(stackAngle);
-        const float y = std::sin(stackAngle);
-
-        for (int j = 0; j <= kSphereSectors; ++j)
-        {
-            const float sectorAngle = j * 2.0f * kPi / kSphereSectors;
-            const float x = xy * std::cos(sectorAngle);
-            const float z = xy * std::sin(sectorAngle);
-            vertices.push_back(x);
-            vertices.push_back(y);
-            vertices.push_back(z);
-        }
-    }
-
-    for (int i = 0; i < kSphereStacks; ++i)
-    {
-        int k1 = i * (kSphereSectors + 1);
-        int k2 = k1 + kSphereSectors + 1;
-
-        for (int j = 0; j < kSphereSectors; ++j, ++k1, ++k2)
-        {
-            if (i != 0)
-            {
-                indices.push_back(k1);
-                indices.push_back(k2);
-                indices.push_back(k1 + 1);
-            }
-
-            if (i != (kSphereStacks - 1))
-            {
-                indices.push_back(k1 + 1);
-                indices.push_back(k2);
-                indices.push_back(k2 + 1);
-            }
-        }
-    }
-
-    sphereIndexCount_ = static_cast<GLsizei>(indices.size());
-
-    glGenVertexArrays(1, &sphereVao_);
-    glGenBuffers(1, &sphereVbo_);
-    glGenBuffers(1, &sphereEbo_);
-
-    glBindVertexArray(sphereVao_);
-
-    glBindBuffer(GL_ARRAY_BUFFER, sphereVbo_);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(float)), vertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEbo_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(indices.size() * sizeof(unsigned int)), indices.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-}
-
-void Player::initCubeMesh()
-{
-    const float cubeVertices[] = {
-        -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f,
-        0.5f,  0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, -0.5f, -0.5f,
-
-        -0.5f, -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  0.5f,  0.5f,
-        0.5f,  0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  -0.5f, -0.5f, 0.5f,
-
-        -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  -0.5f, -0.5f, -0.5f, -0.5f,
-        -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f,  -0.5f, 0.5f,  0.5f,
-
-        0.5f,  0.5f,  0.5f,  0.5f,  0.5f,  -0.5f, 0.5f,  -0.5f, -0.5f,
-        0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, 0.5f,  0.5f,  0.5f,  0.5f,
-
-        -0.5f, -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, 0.5f,
-        0.5f,  -0.5f, 0.5f,  -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, -0.5f,
-
-        -0.5f, 0.5f,  -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  0.5f,
-        0.5f,  0.5f,  0.5f,  -0.5f, 0.5f,  0.5f,  -0.5f, 0.5f,  -0.5f};
-
-    glGenVertexArrays(1, &cubeVao_);
-    glGenBuffers(1, &cubeVbo_);
-
-    glBindVertexArray(cubeVao_);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-}
+Player::~Player() = default;
 
 void Player::update(GLFWwindow* window, float deltaTime, const Map& map)
 {
@@ -178,51 +65,71 @@ void Player::update(GLFWwindow* window, float deltaTime, const Map& map)
         inputDirection.x += 1.0f;
     }
 
-    if (glm::length(inputDirection) <= 0.0f)
-    {
-        return;
-    }
-
-    inputDirection = glm::normalize(inputDirection);
-
-    const float movementStep = moveSpeed_ * deltaTime;
-
-    const glm::vec3 moveX(inputDirection.x * movementStep, 0.0f, 0.0f);
-    const glm::vec3 moveZ(0.0f, 0.0f, inputDirection.z * movementStep);
-
-    const glm::vec3 candidateX = position_ + moveX;
     bool moved = false;
-    if (!collidesWithWall(candidateX, map))
+    const bool hasMovementInput = glm::length(inputDirection) > 0.0f;
+    if (hasMovementInput)
     {
-        position_ = candidateX;
-        moved = true;
-    }
+        inputDirection = glm::normalize(inputDirection);
 
-    const glm::vec3 candidateZ = position_ + moveZ;
-    if (!collidesWithWall(candidateZ, map))
-    {
-        position_ = candidateZ;
-        moved = true;
-    }
+        const float movementStep = moveSpeed_ * std::min(deltaTime, 0.05f);
+        const int subSteps = std::max(1, static_cast<int>(std::ceil(movementStep / 0.03f)));
+        const float stepSize = movementStep / static_cast<float>(subSteps);
 
-    if (moved)
-    {
-        const auto& grid = map.getGrid();
-        if (!grid.empty())
+        for (int i = 0; i < subSteps; ++i)
         {
-            const float rightEdge = static_cast<float>(grid[0].size() - 1);
-            if (position_.x < -0.5f)
+            const glm::vec3 moveX(inputDirection.x * stepSize, 0.0f, 0.0f);
+            const glm::vec3 moveZ(0.0f, 0.0f, inputDirection.z * stepSize);
+
+            if (moveX.x != 0.0f)
             {
-                position_.x = rightEdge;
+                const glm::vec3 candidateX = position_ + moveX;
+                if (!collidesWithWall(candidateX, map))
+                {
+                    position_ = candidateX;
+                    moved = true;
+                }
             }
-            else if (position_.x > rightEdge + 0.5f)
+
+            if (moveZ.z != 0.0f)
             {
-                position_.x = 0.0f;
+                const glm::vec3 candidateZ = position_ + moveZ;
+                if (!collidesWithWall(candidateZ, map))
+                {
+                    position_ = candidateZ;
+                    moved = true;
+                }
+            }
+        }
+
+        if (moved)
+        {
+            const auto& grid = map.getGrid();
+            if (!grid.empty())
+            {
+                const float rightEdge = static_cast<float>(grid[0].size() - 1);
+                if (position_.x < -0.5f)
+                {
+                    position_.x = rightEdge;
+                }
+                else if (position_.x > rightEdge + 0.5f)
+                {
+                    position_.x = 0.0f;
+                }
             }
         }
 
         forwardDirection_ = inputDirection;
         rotationYDegrees_ = glm::degrees(std::atan2(forwardDirection_.x, forwardDirection_.z));
+    }
+
+    setMovingState(hasMovementInput);
+}
+
+void Player::updateAnimation(float deltaTime)
+{
+    if (animator_)
+    {
+        animator_->UpdateAnimation(deltaTime * 0.75f);
     }
 }
 
@@ -231,25 +138,51 @@ void Player::draw(GLuint shaderProgram) const
     const GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
     const GLint colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
 
-    glm::mat4 transform(1.0f);
-    transform = glm::translate(transform, position_);
-    transform = glm::rotate(transform, glm::radians(rotationYDegrees_), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 model(1.0f);
+    model = glm::translate(model, position_);
+    model = glm::rotate(model, glm::radians(rotationYDegrees_), glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::scale(model, glm::vec3(modelScale_));
 
-    glm::mat4 bodyModel = glm::scale(transform, glm::vec3(halfExtents_ / 0.5f));
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &bodyModel[0][0]);
-    glUniform3f(colorLoc, 1.0f, 0.9f, 0.1f);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
+    glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
 
-    glBindVertexArray(sphereVao_);
-    glDrawElements(GL_TRIANGLES, sphereIndexCount_, GL_UNSIGNED_INT, nullptr);
+    if (animator_)
+    {
+        const auto& transforms = animator_->GetFinalBoneMatrices();
+        for (std::size_t i = 0; i < transforms.size(); ++i)
+        {
+            std::string name = "finalBonesMatrices[" + std::to_string(i) + "]";
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, name.c_str()), 1, GL_FALSE, &transforms[i][0][0]);
+        }
+    }
 
-    glm::mat4 markerModel = glm::translate(transform, glm::vec3(0.0f, 0.08f, 0.36f));
-    markerModel = glm::scale(markerModel, glm::vec3(0.14f, 0.10f, 0.18f));
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &markerModel[0][0]);
-    glUniform3f(colorLoc, 0.9f, 0.25f, 0.1f);
+    if (model_)
+    {
+        model_->Draw(shaderProgram);
+    }
+}
 
-    glBindVertexArray(cubeVao_);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
+void Player::setMovingState(bool moving)
+{
+    if (moving == isMoving_)
+    {
+        return;
+    }
+
+    isMoving_ = moving;
+    if (!animator_)
+    {
+        return;
+    }
+
+    if (isMoving_ && walkAnimation_)
+    {
+        animator_->PlayAnimation(walkAnimation_.get());
+    }
+    else
+    {
+        animator_->PlayAnimation(idleAnimation_.get());
+    }
 }
 
 bool Player::collidesWithWall(const glm::vec3& candidatePosition, const Map& map) const
@@ -328,4 +261,5 @@ void Player::reset()
     rotationYDegrees_ = 0.0f;
     hitCooldown_ = 0.0f;
     lives_ = 3;
+    setMovingState(false);
 }
