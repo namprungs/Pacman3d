@@ -77,7 +77,18 @@ void Ghost::update(float deltaTime, const Map& map, const Player& player)
     if (frightenedTimer_ > 0.0f)
     {
         frightenedTimer_ -= deltaTime;
-        state_ = frightenedTimer_ > 0.0f ? GhostState::FRIGHTENED : GhostState::CHASE;
+        if (frightenedTimer_ > 0.0f)
+        {
+            state_ = GhostState::FRIGHTENED;
+            setFrightened(true);
+        }
+        else
+        {
+            frightenedTimer_ = 0.0f;
+            state_ = GhostState::CHASE;
+            stateTimer_ = 0.0f;
+            setFrightened(false);
+        }
     }
     else
     {
@@ -179,6 +190,7 @@ void Ghost::triggerFrightened(float durationSeconds)
 {
     frightenedTimer_ = durationSeconds;
     state_ = GhostState::FRIGHTENED;
+    attackTimer_ = 0.0f;
     setFrightened(true);
 }
 

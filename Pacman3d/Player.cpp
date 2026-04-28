@@ -14,10 +14,16 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+namespace
+{
+    constexpr float kPlayerWallHalfExtent = 0.35f;
+    constexpr float kWallCollisionHalfExtent = 0.44f;
+}
+
 Player::Player()
     : position_(1.0f, 0.35f, 1.0f),
       spawnPosition_(1.0f, 0.35f, 1.0f),
-      halfExtents_(0.43f, 0.35f, 0.43f),
+      halfExtents_(kPlayerWallHalfExtent, 0.35f, kPlayerWallHalfExtent),
       forwardDirection_(0.0f, 0.0f, 1.0f),
       rotationYDegrees_(0.0f),
       moveSpeed_(3.4f),
@@ -200,8 +206,8 @@ bool Player::collidesWithWall(const glm::vec3& candidatePosition, const Map& map
                 continue;
             }
 
-            const glm::vec3 wallMin(static_cast<float>(x) - 0.5f, 0.0f, static_cast<float>(z) - 0.5f);
-            const glm::vec3 wallMax(static_cast<float>(x) + 0.5f, 1.0f, static_cast<float>(z) + 0.5f);
+            const glm::vec3 wallMin(static_cast<float>(x) - kWallCollisionHalfExtent, 0.0f, static_cast<float>(z) - kWallCollisionHalfExtent);
+            const glm::vec3 wallMax(static_cast<float>(x) + kWallCollisionHalfExtent, 1.0f, static_cast<float>(z) + kWallCollisionHalfExtent);
 
             if (intersectsAabb(playerMin, playerMax, wallMin, wallMax))
             {

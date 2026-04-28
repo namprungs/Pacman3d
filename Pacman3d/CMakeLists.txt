@@ -76,7 +76,21 @@ if (NOT assimp_FOUND)
     GIT_REPOSITORY https://github.com/assimp/assimp.git
     GIT_TAG v5.4.1
   )
-  FetchContent_MakeAvailable(assimp)
+  FetchContent_GetProperties(assimp)
+  if (NOT assimp_POPULATED)
+    FetchContent_Populate(assimp)
+
+    set(ASSIMP_CODE_CMAKE "${assimp_SOURCE_DIR}/code/CMakeLists.txt")
+    file(READ "${ASSIMP_CODE_CMAKE}" ASSIMP_CODE_CMAKE_CONTENTS)
+    string(REPLACE
+      "TARGET_COMPILE_FEATURES(assimp PRIVATE c_std_99)"
+      "SET_PROPERTY(TARGET assimp PROPERTY C_STANDARD 99)"
+      ASSIMP_CODE_CMAKE_CONTENTS
+      "${ASSIMP_CODE_CMAKE_CONTENTS}")
+    file(WRITE "${ASSIMP_CODE_CMAKE}" "${ASSIMP_CODE_CMAKE_CONTENTS}")
+
+    add_subdirectory(${assimp_SOURCE_DIR} ${assimp_BINARY_DIR})
+  endif()
 endif()
 
 find_package(GLEW QUIET)
