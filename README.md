@@ -4,7 +4,9 @@ Use WASD key to move
 
 
 Collect all coins to win
+
 Tomato for bonus point
+
 Collecting star medal allowed you to attack zombies
 
 https://torrak.itch.io/paczombie
