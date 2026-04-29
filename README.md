@@ -1,5 +1,7 @@
 An escaping zombies game
+
 Use WASD key to move
+
 
 Collect all coins to win
 Tomato for bonus point
